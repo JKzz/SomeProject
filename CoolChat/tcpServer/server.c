@@ -6,18 +6,20 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define PORT 6666		/*监听端口*/
 #define BACKLOG 5		/*监听队列长度*/
-void process_conn_server(int s);
-
+// void process_conn_server(int s);
+void *start_routine( void *ptr);
 int  main(){
     int ss, sc;			/*ss为服务器套接字描述符
 						  sc为客户端的套接字描述符*/
     struct sockaddr_in server_addr;/*服务器地址结构*/
     struct sockaddr_in client_addr;/*客户端地址结果*/
 	int err;			/*返回值*/
-	pid_t pid;			/*子进程ID*/
+	// pid_t pid;			/*子进程ID*/
+	pthread_t thread; //定义一个线程号
 	
 	/*建立一个流式套接字*/
 	ss = socket(AF_INET, SOCK_STREAM, 0);
@@ -59,22 +61,18 @@ int  main(){
     	if(sc < 0){
     		continue;
     	}
-    	
-    	/*建立一个新的进程来处理客户端的连接*/
-    	pid = fork();	/*创建子进程*/
-    	if(pid == 0){	/*子进程中*/
-    		close(ss);	/*子进程中关闭服务器的监听
-						（不会关闭真的关闭，只有所有进程都关闭，系统才会释放）*/
-    		process_conn_server(sc);/*处理连接*/
-    	}else{			
-    		close(sc);	/*父进程中关闭客户端的连接*/
-    	}
+    	printf("You got a connection from %s\n",inet_ntoa(client_addr.sin_addr) );
+    	/*建立一个新的线程来处理客户端的连接*/
+		pthread_create(&thread,NULL,start_routine,(void *)&sc);
     }
+	close(ss);
+	return(1);
 }
 
 
-void process_conn_server(int s){
-    ssize_t size = 0;
+void *start_routine(void *ptr){
+    int s = *(int *)ptr;
+	ssize_t size = 0;
     char buffer[1024];
     
     for(;;){
@@ -88,4 +86,5 @@ void process_conn_server(int s){
     	sprintf(buffer, "%d bytes altogether\n", size);
     	write(s, buffer, strlen(buffer)+1);
     }
+	close(s);
 }
